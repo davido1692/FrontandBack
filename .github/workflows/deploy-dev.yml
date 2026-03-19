@@ -1,0 +1,79 @@
+name: Deploy to Dev
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::751545121618:role/github-oidc-role
+          aws-region: us-east-1
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Get ALB DNS
+        id: alb
+        run: |
+          ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --names app-alb \
+            --query 'LoadBalancers[0].DNSName' \
+            --output text)
+          echo "dns=$ALB_DNS" >> $GITHUB_OUTPUT
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --build-arg REACT_APP_BACKEND_URL=http://${{ steps.alb.outputs.dns }} \
+            -t frontend:${{ github.sha }} \
+            ./frontend
+
+      - name: Tag image for ECR
+        run: |
+          docker tag frontend:${{ github.sha }} \
+            751545121618.dkr.ecr.us-east-1.amazonaws.com/frontend:${{ github.sha }}
+
+      - name: Push image to ECR
+        run: |
+          docker push 751545121618.dkr.ecr.us-east-1.amazonaws.com/frontend:${{ github.sha }}
+
+      - name: Prepare task definition
+        run: |
+          sed "s|IMAGE_TAG|${{ github.sha }}|g" infra/task-definitions/frontend.json > frontend-task.json
+
+      - name: Register task definition
+        run: |
+          aws ecs register-task-definition \
+            --cli-input-json file://frontend-task.json
+
+      - name: Deploy to GREEN service
+        run: |
+          aws ecs update-service \
+            --cluster dev-cluster \
+            --service frontend-green \
+            --force-new-deployment
+
+      - name: Wait for GREEN to stabilize
+        run: |
+          aws ecs wait services-stable \
+            --cluster dev-cluster \
+            --services frontend-green
+
+      - name: Switch ALB traffic to GREEN
+        run: |
+          aws elbv2 modify-listener \
+            --listener-arn ${{ secrets.ALB_LISTENER_ARN }} \
+            --default-actions Type=forward,TargetGroupArn=${{ secrets.GREEN_TG_ARN }}
