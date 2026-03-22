@@ -49,7 +49,9 @@ module "frontend_green" {
   container_port          = 3000
   private_subnets         = module.vpc.private_subnets
   task_execution_role_arn = aws_iam_role.ecs_task_execution_role.arn
+  target_group_arn        = module.alb.green_tg_arn
   security_group_ids      = [aws_security_group.ecs_sg.id]
+  listener_arn            = module.alb.listener_arn
 }
 
 module "backend_blue" {
@@ -79,7 +81,9 @@ module "backend_green" {
   container_port          = 8080
   private_subnets         = module.vpc.private_subnets
   task_execution_role_arn = aws_iam_role.ecs_task_execution_role.arn
+  target_group_arn        = module.alb.backend_green_tg_arn
   security_group_ids      = [aws_security_group.ecs_sg.id]
+  listener_arn            = module.alb.listener_arn
   environment = [
     {
       name  = "CORS_ORIGIN"
