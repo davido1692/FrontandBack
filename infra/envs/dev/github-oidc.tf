@@ -66,7 +66,9 @@ resource "aws_iam_role_policy" "github_oidc" {
           "elasticloadbalancing:DescribeLoadBalancers",
           "elasticloadbalancing:DescribeListeners",
           "elasticloadbalancing:DescribeTargetGroups",
-          "elasticloadbalancing:ModifyListener"
+          "elasticloadbalancing:DescribeRules",
+          "elasticloadbalancing:ModifyListener",
+          "elasticloadbalancing:ModifyRule"
         ]
         Resource = "*"
       },

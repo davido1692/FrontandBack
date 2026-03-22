@@ -41,14 +41,16 @@ resource "aws_ecs_service" "svc" {
     assign_public_ip = false
   }
 
-  load_balancer {
-    target_group_arn = var.target_group_arn
-    container_name   = var.service_name
-    container_port   = var.container_port
+  dynamic "load_balancer" {
+    for_each = var.target_group_arn != null ? [1] : []
+    content {
+      target_group_arn = var.target_group_arn
+      container_name   = var.service_name
+      container_port   = var.container_port
+    }
   }
 
   depends_on = [
-    aws_ecs_task_definition.task,
-    var.listener_arn
+    aws_ecs_task_definition.task
   ]
 }

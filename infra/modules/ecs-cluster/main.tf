@@ -22,5 +22,3 @@ resource "aws_iam_role_policy_attachment" "task_exec_attach" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-output "cluster_id" { value = aws_ecs_cluster.main.id }
-output "task_execution_role_arn" { value = aws_iam_role.task_execution.arn }
