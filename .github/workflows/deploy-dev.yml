@@ -119,6 +119,6 @@ jobs:
 
       - name: Switch backend ALB traffic to GREEN
         run: |
-          aws elbv2 modify-listener-rule \
+          aws elbv2 modify-rule \
             --rule-arn ${{ secrets.BACKEND_LISTENER_RULE_ARN }} \
             --actions Type=forward,TargetGroupArn=${{ secrets.BACKEND_GREEN_TG_ARN }}
