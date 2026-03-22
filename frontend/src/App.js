@@ -1,29 +1,15 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import './App.css';
-import config from './config'
 
 function App() {
-  const [successMessage, setSuccessMessage] = useState() 
-  const [failureMessage, setFailureMessage] = useState() 
-
-  useEffect(() => {
-    const getId = async () => {
-      try {
-        const resp = await fetch(config.backendUrl)
-        setSuccessMessage((await resp.json()).id)
-      }
-      catch(e) {
-        setFailureMessage(e.message)
-      }
-    }
-    getId()
-  }, [])
-
   return (
     <div className="App">
-      {!failureMessage && !successMessage ? 'Fetching...' : null}
-      {failureMessage ? failureMessage : null}
-      {successMessage ? successMessage : null}
+      <div className="hero">
+        <h1 className="title">Winners Never Quit</h1>
+        <div className="divider"></div>
+        <h2 className="subtitle">Quitters Never Win</h2>
+        <p className="tagline">Stay the course. Trust the process. Embrace the grind.</p>
+      </div>
     </div>
   );
 }
