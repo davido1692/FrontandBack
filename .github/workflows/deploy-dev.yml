@@ -34,46 +34,91 @@ jobs:
             --output text)
           echo "dns=$ALB_DNS" >> $GITHUB_OUTPUT
 
-      - name: Build Docker image
+      - name: Build frontend Docker image
         run: |
           docker build \
             --build-arg REACT_APP_BACKEND_URL=http://${{ steps.alb.outputs.dns }} \
             -t frontend:${{ github.sha }} \
             ./frontend
 
-      - name: Tag image for ECR
+      - name: Tag frontend image for ECR
         run: |
           docker tag frontend:${{ github.sha }} \
             751545121618.dkr.ecr.us-east-1.amazonaws.com/frontend:${{ github.sha }}
 
-      - name: Push image to ECR
+      - name: Push frontend image to ECR
         run: |
           docker push 751545121618.dkr.ecr.us-east-1.amazonaws.com/frontend:${{ github.sha }}
 
-      - name: Prepare task definition
+      - name: Build backend Docker image
+        run: |
+          docker build -t backend:${{ github.sha }} ./backend
+
+      - name: Tag backend image for ECR
+        run: |
+          docker tag backend:${{ github.sha }} \
+            751545121618.dkr.ecr.us-east-1.amazonaws.com/backend:${{ github.sha }}
+
+      - name: Push backend image to ECR
+        run: |
+          docker push 751545121618.dkr.ecr.us-east-1.amazonaws.com/backend:${{ github.sha }}
+
+      - name: Prepare frontend task definition
         run: |
           sed "s|IMAGE_TAG|${{ github.sha }}|g" infra/task-definitions/frontend.json > frontend-task.json
 
-      - name: Register task definition
+      - name: Register frontend task definition
+        id: frontend-task-def
         run: |
-          aws ecs register-task-definition \
-            --cli-input-json file://frontend-task.json
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://frontend-task.json \
+            --query "taskDefinition.taskDefinitionArn" \
+            --output text)
+          echo "arn=$TASK_DEF_ARN" >> $GITHUB_OUTPUT
 
-      - name: Deploy to GREEN service
+      - name: Prepare backend task definition
+        run: |
+          sed -e "s|IMAGE_TAG|${{ github.sha }}|g" \
+              -e "s|ALB_DNS|${{ steps.alb.outputs.dns }}|g" \
+              infra/task-definitions/backend.json > backend-task.json
+
+      - name: Register backend task definition
+        id: backend-task-def
+        run: |
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://backend-task.json \
+            --query "taskDefinition.taskDefinitionArn" \
+            --output text)
+          echo "arn=$TASK_DEF_ARN" >> $GITHUB_OUTPUT
+
+      - name: Deploy frontend to GREEN service
         run: |
           aws ecs update-service \
             --cluster dev-cluster \
             --service frontend-green \
-            --force-new-deployment
+            --task-definition ${{ steps.frontend-task-def.outputs.arn }}
 
-      - name: Wait for GREEN to stabilize
+      - name: Deploy backend to GREEN service
+        run: |
+          aws ecs update-service \
+            --cluster dev-cluster \
+            --service backend-green \
+            --task-definition ${{ steps.backend-task-def.outputs.arn }}
+
+      - name: Wait for GREEN services to stabilize
         run: |
           aws ecs wait services-stable \
             --cluster dev-cluster \
-            --services frontend-green
+            --services frontend-green backend-green
 
-      - name: Switch ALB traffic to GREEN
+      - name: Switch frontend ALB traffic to GREEN
         run: |
           aws elbv2 modify-listener \
             --listener-arn ${{ secrets.ALB_LISTENER_ARN }} \
             --default-actions Type=forward,TargetGroupArn=${{ secrets.GREEN_TG_ARN }}
+
+      - name: Switch backend ALB traffic to GREEN
+        run: |
+          aws elbv2 modify-listener-rule \
+            --rule-arn ${{ secrets.BACKEND_LISTENER_RULE_ARN }} \
+            --actions Type=forward,TargetGroupArn=${{ secrets.BACKEND_GREEN_TG_ARN }}
