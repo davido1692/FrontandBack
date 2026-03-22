@@ -40,6 +40,9 @@ resource "aws_ecs_service" "svc" {
     security_groups  = var.security_group_ids
     assign_public_ip = false
   }
+ deployment_controller {
+    type = "CODE_DEPLOY"
+  }
 
   dynamic "load_balancer" {
     for_each = var.target_group_arn != null ? [1] : []

@@ -74,6 +74,17 @@ resource "aws_iam_role_policy" "github_oidc" {
       },
       {
         Effect = "Allow"
+        Action = [
+          "codedeploy:CreateDeployment",
+          "codedeploy:GetDeployment",
+          "codedeploy:GetDeploymentConfig",
+          "codedeploy:RegisterApplicationRevision",
+          "codedeploy:GetApplicationRevision"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
         Action = "iam:PassRole"
         Resource = aws_iam_role.ecs_task_execution_role.arn
       }

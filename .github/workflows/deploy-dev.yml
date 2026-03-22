@@ -91,34 +91,20 @@ jobs:
             --output text)
           echo "arn=$TASK_DEF_ARN" >> $GITHUB_OUTPUT
 
-      - name: Deploy frontend to GREEN service
+      - name: Deploy frontend via CodeDeploy
         run: |
-          aws ecs update-service \
-            --cluster dev-cluster \
-            --service frontend-green \
-            --task-definition ${{ steps.frontend-task-def.outputs.arn }}
+            sed "s|<TASK_DEFINITION>|${{ steps.frontend-task-def.outputs.arn }}|g" appspec.yaml > appspec-frontend.json
+            aws deploy create-deployment \
+              --application-name dev-app \
+              --deployment-group-name frontend-deployment-group \
+              --revision revisionType=AppSpecContent,appSpecContent={content="$(cat appspec-frontend.json)"} \
+              --region us-east-1
 
-      - name: Deploy backend to GREEN service
+      - name: Deploy backend via CodeDeploy
         run: |
-          aws ecs update-service \
-            --cluster dev-cluster \
-            --service backend-green \
-            --task-definition ${{ steps.backend-task-def.outputs.arn }}
-
-      - name: Wait for GREEN services to stabilize
-        run: |
-          aws ecs wait services-stable \
-            --cluster dev-cluster \
-            --services frontend-green backend-green
-
-      - name: Switch frontend ALB traffic to GREEN
-        run: |
-          aws elbv2 modify-listener \
-            --listener-arn ${{ secrets.ALB_LISTENER_ARN }} \
-            --default-actions Type=forward,TargetGroupArn=${{ secrets.GREEN_TG_ARN }}
-
-      - name: Switch backend ALB traffic to GREEN
-        run: |
-          aws elbv2 modify-rule \
-            --rule-arn ${{ secrets.BACKEND_LISTENER_RULE_ARN }} \
-            --actions Type=forward,TargetGroupArn=${{ secrets.BACKEND_GREEN_TG_ARN }}
+            sed "s|<TASK_DEFINITION>|${{ steps.backend-task-def.outputs.arn }}|g" infra/task-definitions/appspec-backend.yaml > appspec-backend.json
+            aws deploy create-deployment \
+              --application-name dev-app \
+              --deployment-group-name backend-deployment-group \
+              --revision revisionType=AppSpecContent,appSpecContent={content="$(cat appspec-backend.json)"} \
+              --region us-east-1
