@@ -66,7 +66,7 @@
       }
     }
 
-    depends_on = [module.frontend_blue, module.frontend_green, module.alb]
+    depends_on = [module.frontend_blue, module.frontend_green, module.alb, aws_lambda_function.validate_deployment]
   }
 
   resource "aws_codedeploy_deployment_group" "backend" {

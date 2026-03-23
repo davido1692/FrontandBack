@@ -13,7 +13,12 @@ resource "aws_lb_target_group" "frontend_blue" {
   target_type = "ip"
 
   health_check {
-    path = "/health"
+    path                = "/"
+    matcher             = "200"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
   }
 }
 
@@ -25,7 +30,12 @@ resource "aws_lb_target_group" "frontend_green" {
   target_type = "ip"
 
   health_check {
-    path = "/health"
+    path                = "/"
+    matcher             = "200"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
   }
 }
 
@@ -37,7 +47,12 @@ resource "aws_lb_target_group" "backend_blue" {
   target_type = "ip"
 
   health_check {
-    path = "/health"
+    path                = "/health"
+    matcher             = "200"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
   }
 }
 
@@ -49,7 +64,12 @@ resource "aws_lb_target_group" "backend_green" {
   target_type = "ip"
 
   health_check {
-    path = "/health"
+    path                = "/health"
+    matcher             = "200"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
   }
 }
 

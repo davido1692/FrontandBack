@@ -93,20 +93,40 @@ jobs:
 
       - name: Deploy frontend via CodeDeploy
         run: |
-            sed "s|<TASK_DEFINITION>|${{ steps.frontend-task-def.outputs.arn }}|g" appspec.json > appspec-frontend.json
-            CONTENT=$(cat appspec-frontend.json)
-            aws deploy create-deployment \
-              --application-name dev-app \
-              --deployment-group-name frontend-deployment-group \
-              --revision "revisionType=AppSpecContent,appSpecContent={content='$CONTENT'}" \
-              --region us-east-1
+          sed "s|<TASK_DEFINITION>|${{ steps.frontend-task-def.outputs.arn }}|g" appspec.json > appspec-frontend.json
+          CONTENT=$(jq -Rs '.' appspec-frontend.json)
+          cat > frontend-deployment.json << EOF
+          {
+            "applicationName": "dev-app",
+            "deploymentGroupName": "frontend-deployment-group",
+            "revision": {
+              "revisionType": "AppSpecContent",
+              "appSpecContent": {
+                "content": $CONTENT
+              }
+            }
+          }
+          EOF
+          aws deploy create-deployment \
+            --cli-input-json file://frontend-deployment.json \
+            --region us-east-1
 
       - name: Deploy backend via CodeDeploy
         run: |
-            sed "s|<TASK_DEFINITION>|${{ steps.backend-task-def.outputs.arn }}|g" infra/task-definitions/appspec-backend.json > appspec-backend-final.json
-            CONTENT=$(cat appspec-backend-final.json)
-            aws deploy create-deployment \
-              --application-name dev-app \
-              --deployment-group-name backend-deployment-group \
-              --revision "revisionType=AppSpecContent,appSpecContent={content='$CONTENT'}" \
-              --region us-east-1
+          sed "s|<TASK_DEFINITION>|${{ steps.backend-task-def.outputs.arn }}|g" infra/task-definitions/appspec-backend.json > appspec-backend-final.json
+          CONTENT=$(jq -Rs '.' appspec-backend-final.json)
+          cat > backend-deployment.json << EOF
+          {
+            "applicationName": "dev-app",
+            "deploymentGroupName": "backend-deployment-group",
+            "revision": {
+              "revisionType": "AppSpecContent",
+              "appSpecContent": {
+                "content": $CONTENT
+              }
+            }
+          }
+          EOF
+          aws deploy create-deployment \
+            --cli-input-json file://backend-deployment.json \
+            --region us-east-1
