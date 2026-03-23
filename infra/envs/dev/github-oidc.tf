@@ -86,7 +86,10 @@ resource "aws_iam_role_policy" "github_oidc" {
       {
         Effect = "Allow"
         Action = "iam:PassRole"
-        Resource = aws_iam_role.ecs_task_execution_role.arn
+        Resource = [
+          aws_iam_role.ecs_task_execution_role.arn,
+          aws_iam_role.codedeploy.arn
+        ]
       }
     ]
   })

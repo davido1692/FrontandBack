@@ -65,6 +65,8 @@
         }
       }
     }
+
+    depends_on = [module.frontend_blue, module.frontend_green, module.alb]
   }
 
   resource "aws_codedeploy_deployment_group" "backend" {
@@ -111,4 +113,6 @@
         }
       }
     }
+
+    depends_on = [module.backend_blue, module.backend_green, module.alb]
   }

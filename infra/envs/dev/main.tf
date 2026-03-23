@@ -39,6 +39,7 @@ module "frontend_blue" {
   target_group_arn        = module.alb.blue_tg_arn
   security_group_ids      = [aws_security_group.ecs_sg.id]
   listener_arn            = module.alb.listener_arn
+  depends_on              = [module.alb]
 }
 
 module "frontend_green" {
@@ -72,6 +73,7 @@ module "backend_blue" {
       value = "http://${module.alb.alb_dns}"
     }
   ]
+  depends_on = [module.alb]
 }
 
 module "backend_green" {
