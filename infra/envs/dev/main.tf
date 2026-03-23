@@ -52,6 +52,7 @@ module "frontend_green" {
   target_group_arn        = module.alb.green_tg_arn
   security_group_ids      = [aws_security_group.ecs_sg.id]
   listener_arn            = module.alb.listener_arn
+  depends_on              = [module.alb]
 }
 
 module "backend_blue" {
@@ -84,6 +85,7 @@ module "backend_green" {
   target_group_arn        = module.alb.backend_green_tg_arn
   security_group_ids      = [aws_security_group.ecs_sg.id]
   listener_arn            = module.alb.listener_arn
+  depends_on              = [module.alb]
   environment = [
     {
       name  = "CORS_ORIGIN"

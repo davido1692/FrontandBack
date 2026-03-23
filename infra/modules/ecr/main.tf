@@ -1,3 +1,4 @@
-resource "aws_ecr_repository" "this" {
-  name = var.name
-}
+ resource "aws_ecr_repository" "this" {
+    name         = var.name
+    force_delete = true
+  }
