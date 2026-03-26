@@ -88,7 +88,9 @@ resource "aws_iam_role_policy" "github_oidc" {
         Action = "iam:PassRole"
         Resource = [
           aws_iam_role.ecs_task_execution_role.arn,
-          aws_iam_role.codedeploy.arn
+          aws_iam_role.codedeploy.arn,
+          "arn:aws:iam::751545121618:role/codedeploy-role-prod",
+          "arn:aws:iam::751545121618:role/prod-cluster-task-exec"
         ]
       }
     ]

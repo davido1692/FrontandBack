@@ -74,8 +74,6 @@ resource "aws_security_group" "prom_sg" {
 # Task Definition
 ############################################
 
-data "aws_region" "current" {}
-
 resource "aws_ecs_task_definition" "prometheus" {
   family                   = "prometheus"
   requires_compatibilities = ["FARGATE"]
@@ -106,23 +104,6 @@ resource "aws_ecs_task_definition" "prometheus" {
         {
           sourceVolume  = "prometheus_data"
           containerPath = "/prometheus"
-        }
-      ]
-    },
-    {
-      name  = "cloudwatch-exporter"
-      image = "prom/cloudwatch-exporter:latest"
-      essential = true
-      portMappings = [
-        {
-          containerPort = 9106
-          hostPort      = 9106
-        }
-      ]
-      environment = [
-        {
-          name  = "AWS_REGION"
-          value = data.aws_region.current.name
         }
       ]
     }

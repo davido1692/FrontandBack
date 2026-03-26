@@ -1,0 +1,30 @@
+{
+  "family": "frontend-green-prod",
+  "requiresCompatibilities": ["FARGATE"],
+  "networkMode": "awsvpc",
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::751545121618:role/prod-cluster-task-exec",
+  "containerDefinitions": [
+    {
+      "name": "frontend-green",
+      "image": "751545121618.dkr.ecr.us-east-1.amazonaws.com/frontend-prod:IMAGE_TAG",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 3000,
+          "hostPort": 3000,
+          "protocol": "tcp"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/frontend-green-prod",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}

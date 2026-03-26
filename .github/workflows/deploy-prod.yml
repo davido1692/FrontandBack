@@ -1,0 +1,132 @@
+name: Deploy to Prod
+
+on:
+  push:
+    branches: [ "prod" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::751545121618:role/github-oidc-role
+          aws-region: us-east-1
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Get ALB DNS
+        id: alb
+        run: |
+          ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --names prod-alb \
+            --query 'LoadBalancers[0].DNSName' \
+            --output text)
+          echo "dns=$ALB_DNS" >> $GITHUB_OUTPUT
+
+      - name: Build frontend Docker image
+        run: |
+          docker build \
+            --build-arg REACT_APP_BACKEND_URL=http://${{ steps.alb.outputs.dns }} \
+            -t frontend:${{ github.sha }} \
+            ./frontend
+
+      - name: Tag frontend image for ECR
+        run: |
+          docker tag frontend:${{ github.sha }} \
+            751545121618.dkr.ecr.us-east-1.amazonaws.com/frontend-prod:${{ github.sha }}
+
+      - name: Push frontend image to ECR
+        run: |
+          docker push 751545121618.dkr.ecr.us-east-1.amazonaws.com/frontend-prod:${{ github.sha }}
+
+      - name: Build backend Docker image
+        run: |
+          docker build -t backend:${{ github.sha }} ./backend
+
+      - name: Tag backend image for ECR
+        run: |
+          docker tag backend:${{ github.sha }} \
+            751545121618.dkr.ecr.us-east-1.amazonaws.com/backend-prod:${{ github.sha }}
+
+      - name: Push backend image to ECR
+        run: |
+          docker push 751545121618.dkr.ecr.us-east-1.amazonaws.com/backend-prod:${{ github.sha }}
+
+      - name: Prepare frontend task definition
+        run: |
+          sed "s|IMAGE_TAG|${{ github.sha }}|g" infra/task-definitions/frontend-prod.json > frontend-task-prod.json
+
+      - name: Register frontend task definition
+        id: frontend-task-def
+        run: |
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://frontend-task-prod.json \
+            --query "taskDefinition.taskDefinitionArn" \
+            --output text)
+          echo "arn=$TASK_DEF_ARN" >> $GITHUB_OUTPUT
+
+      - name: Prepare backend task definition
+        run: |
+          sed -e "s|IMAGE_TAG|${{ github.sha }}|g" \
+              -e "s|ALB_DNS|${{ steps.alb.outputs.dns }}|g" \
+              infra/task-definitions/backend-prod.json > backend-task-prod.json
+
+      - name: Register backend task definition
+        id: backend-task-def
+        run: |
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://backend-task-prod.json \
+            --query "taskDefinition.taskDefinitionArn" \
+            --output text)
+          echo "arn=$TASK_DEF_ARN" >> $GITHUB_OUTPUT
+
+      - name: Deploy frontend via CodeDeploy
+        run: |
+          sed "s|<TASK_DEFINITION>|${{ steps.frontend-task-def.outputs.arn }}|g" appspec.json > appspec-frontend-prod.json
+          CONTENT=$(jq -Rs '.' appspec-frontend-prod.json)
+          cat > frontend-deployment-prod.json << EOF
+          {
+            "applicationName": "prod-app",
+            "deploymentGroupName": "frontend-deployment-group-prod",
+            "revision": {
+              "revisionType": "AppSpecContent",
+              "appSpecContent": {
+                "content": $CONTENT
+              }
+            }
+          }
+          EOF
+          aws deploy create-deployment \
+            --cli-input-json file://frontend-deployment-prod.json \
+            --region us-east-1
+
+      - name: Deploy backend via CodeDeploy
+        run: |
+          sed "s|<TASK_DEFINITION>|${{ steps.backend-task-def.outputs.arn }}|g" infra/task-definitions/appspec-backend.json > appspec-backend-prod-final.json
+          CONTENT=$(jq -Rs '.' appspec-backend-prod-final.json)
+          cat > backend-deployment-prod.json << EOF
+          {
+            "applicationName": "prod-app",
+            "deploymentGroupName": "backend-deployment-group-prod",
+            "revision": {
+              "revisionType": "AppSpecContent",
+              "appSpecContent": {
+                "content": $CONTENT
+              }
+            }
+          }
+          EOF
+          aws deploy create-deployment \
+            --cli-input-json file://backend-deployment-prod.json \
+            --region us-east-1

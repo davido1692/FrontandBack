@@ -1,12 +1,12 @@
 resource "aws_lb" "app" {
-  name               = "app-alb"
+  name               = var.name
   load_balancer_type = "application"
   subnets            = var.public_subnets
   security_groups    = var.security_group_ids
 }
 
 resource "aws_lb_target_group" "frontend_blue" {
-  name        = "frontend-blue-tg"
+  name        = "${var.name}-fe-blue-tg"
   port        = 3000
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
@@ -23,7 +23,7 @@ resource "aws_lb_target_group" "frontend_blue" {
 }
 
 resource "aws_lb_target_group" "frontend_green" {
-  name        = "frontend-green-tg"
+  name        = "${var.name}-fe-green-tg"
   port        = 3000
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
@@ -40,7 +40,7 @@ resource "aws_lb_target_group" "frontend_green" {
 }
 
 resource "aws_lb_target_group" "backend_blue" {
-  name        = "backend-blue-tg"
+  name        = "${var.name}-be-blue-tg"
   port        = 8080
   protocol    = "HTTP"
   vpc_id      = var.vpc_id
@@ -57,7 +57,7 @@ resource "aws_lb_target_group" "backend_blue" {
 }
 
 resource "aws_lb_target_group" "backend_green" {
-  name        = "backend-green-tg"
+  name        = "${var.name}-be-green-tg"
   port        = 8080
   protocol    = "HTTP"
   vpc_id      = var.vpc_id

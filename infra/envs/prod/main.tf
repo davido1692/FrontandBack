@@ -77,6 +77,7 @@ resource "aws_security_group" "ecs_sg" {
 module "alb" {
   source = "../../modules/alb"
 
+  name               = "prod-alb"
   vpc_id             = module.vpc.vpc_id
   public_subnets     = module.vpc.public_subnets
   security_group_ids = [aws_security_group.alb_sg.id]
@@ -98,13 +99,14 @@ module "frontend_blue" {
 
   cluster_id              = module.ecs_cluster.cluster_id
   service_name            = "frontend-blue-prod"
-  container_image         = "${module.frontend_ecr.repository_url}:stable"
+  container_image         = "${module.frontend_ecr.repository_url}:v1"
   container_port          = 3000
   private_subnets         = module.vpc.private_subnets
   task_execution_role_arn = module.ecs_cluster.task_execution_role_arn
   target_group_arn        = module.alb.blue_tg_arn
   security_group_ids      = [aws_security_group.ecs_sg.id]
   listener_arn            = module.alb.listener_arn
+  depends_on              = [module.alb]
 }
 
 module "frontend_green" {
@@ -112,13 +114,14 @@ module "frontend_green" {
 
   cluster_id              = module.ecs_cluster.cluster_id
   service_name            = "frontend-green-prod"
-  container_image         = "${module.frontend_ecr.repository_url}:stable"
+  container_image         = "${module.frontend_ecr.repository_url}:v1"
   container_port          = 3000
   private_subnets         = module.vpc.private_subnets
   task_execution_role_arn = module.ecs_cluster.task_execution_role_arn
   target_group_arn        = module.alb.green_tg_arn
   security_group_ids      = [aws_security_group.ecs_sg.id]
   listener_arn            = module.alb.listener_arn
+  depends_on              = [module.alb]
 }
 
 ############################################
@@ -129,13 +132,14 @@ module "backend_blue" {
 
   cluster_id              = module.ecs_cluster.cluster_id
   service_name            = "backend-blue-prod"
-  container_image         = "${module.backend_ecr.repository_url}:stable"
+  container_image         = "${module.backend_ecr.repository_url}:v1"
   container_port          = 8080
   private_subnets         = module.vpc.private_subnets
   task_execution_role_arn = module.ecs_cluster.task_execution_role_arn
   target_group_arn        = module.alb.backend_blue_tg_arn
   security_group_ids      = [aws_security_group.ecs_sg.id]
   listener_arn            = module.alb.listener_arn
+  depends_on              = [module.alb]
   environment = [
     {
       name  = "CORS_ORIGIN"
@@ -149,13 +153,14 @@ module "backend_green" {
 
   cluster_id              = module.ecs_cluster.cluster_id
   service_name            = "backend-green-prod"
-  container_image         = "${module.backend_ecr.repository_url}:stable"
+  container_image         = "${module.backend_ecr.repository_url}:v1"
   container_port          = 8080
   private_subnets         = module.vpc.private_subnets
   task_execution_role_arn = module.ecs_cluster.task_execution_role_arn
   target_group_arn        = module.alb.backend_green_tg_arn
   security_group_ids      = [aws_security_group.ecs_sg.id]
   listener_arn            = module.alb.listener_arn
+  depends_on              = [module.alb]
   environment = [
     {
       name  = "CORS_ORIGIN"

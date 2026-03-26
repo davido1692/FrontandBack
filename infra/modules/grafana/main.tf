@@ -73,26 +73,22 @@ resource "aws_ecs_task_definition" "grafana" {
         {
           name  = "GF_SECURITY_ADMIN_PASSWORD"
           value = "admin123"
-        }
-      ]
-      volumeMounts = [
+        },
         {
-          name      = "grafana-provisioning"
-          mountPath = "/etc/grafana/provisioning/datasources"
-          readOnly  = false
+          name  = "GF_DATASOURCES_DEFAULT_TYPE"
+          value = "prometheus"
+        },
+        {
+          name  = "GF_DATASOURCES_DEFAULT_URL"
+          value = var.prometheus_internal_url
+        },
+        {
+          name  = "GF_DATASOURCES_DEFAULT_IS_DEFAULT"
+          value = "true"
         }
       ]
     }
   ])
-
-  volume {
-    name = "grafana-provisioning"
-
-    docker_volume_configuration {
-      scope         = "task"
-      autoprovision = true
-    }
-  }
 }
 
 ############################################
