@@ -1,0 +1,133 @@
+name: Deploy to AWS ECS
+
+on:
+  push:
+    branches: [migration]
+
+env:
+  AWS_REGION: us-east-1
+  PROJECT_NAME: migration-app
+  ECS_CLUSTER: migration-app-cluster
+  BACKEND_SERVICE: migration-app-backend
+  FRONTEND_SERVICE: migration-app-frontend
+  ECR_BACKEND: 751545121618.dkr.ecr.us-east-1.amazonaws.com/migration-app/backend
+  ECR_FRONTEND: 751545121618.dkr.ecr.us-east-1.amazonaws.com/migration-app/frontend
+
+permissions:
+  id-token: write  # Required for OIDC
+  contents: read
+
+jobs:
+  deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push backend image
+        id: backend
+        run: |
+          IMAGE=$ECR_BACKEND:${{ github.sha }}
+          docker build -t $IMAGE ./Migration/backend
+          docker push $IMAGE
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+
+      - name: Get ALB DNS name
+        id: alb
+        run: |
+          ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --names "$PROJECT_NAME-alb" \
+            --query "LoadBalancers[0].DNSName" \
+            --output text)
+          echo "dns=$ALB_DNS" >> $GITHUB_OUTPUT
+
+      - name: Build and push frontend image
+        id: frontend
+        run: |
+          IMAGE=$ECR_FRONTEND:${{ github.sha }}
+          docker build \
+            --build-arg REACT_APP_API_URL=http://${{ steps.alb.outputs.dns }}:8080 \
+            -t $IMAGE ./Migration/frontend
+          docker push $IMAGE
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+
+      - name: Update backend ECS service
+        run: |
+          TASK_DEF=$(aws ecs describe-task-definition \
+            --task-definition $PROJECT_NAME-backend \
+            --query "taskDefinition" \
+            --output json)
+
+          NEW_TASK_DEF=$(echo $TASK_DEF | python3 -c "
+          import json, sys
+          td = json.load(sys.stdin)
+          td['containerDefinitions'][0]['image'] = '${{ steps.backend.outputs.image }}'
+          for key in ['taskDefinitionArn','revision','status','requiresAttributes','compatibilities','registeredAt','registeredBy']:
+              td.pop(key, None)
+          print(json.dumps(td))
+          ")
+
+          NEW_ARN=$(aws ecs register-task-definition \
+            --cli-input-json "$NEW_TASK_DEF" \
+            --query "taskDefinition.taskDefinitionArn" \
+            --output text)
+
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $BACKEND_SERVICE \
+            --task-definition $NEW_ARN
+
+      - name: Update frontend ECS service
+        run: |
+          TASK_DEF=$(aws ecs describe-task-definition \
+            --task-definition $PROJECT_NAME-frontend \
+            --query "taskDefinition" \
+            --output json)
+
+          NEW_TASK_DEF=$(echo $TASK_DEF | python3 -c "
+          import json, sys
+          td = json.load(sys.stdin)
+          td['containerDefinitions'][0]['image'] = '${{ steps.frontend.outputs.image }}'
+          for key in ['taskDefinitionArn','revision','status','requiresAttributes','compatibilities','registeredAt','registeredBy']:
+              td.pop(key, None)
+          print(json.dumps(td))
+          ")
+
+          NEW_ARN=$(aws ecs register-task-definition \
+            --cli-input-json "$NEW_TASK_DEF" \
+            --query "taskDefinition.taskDefinitionArn" \
+            --output text)
+
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $FRONTEND_SERVICE \
+            --task-definition $NEW_ARN
+
+      - name: Wait for backend stability
+        run: |
+          aws ecs wait services-stable \
+            --cluster $ECS_CLUSTER \
+            --services $BACKEND_SERVICE
+
+      - name: Wait for frontend stability
+        run: |
+          aws ecs wait services-stable \
+            --cluster $ECS_CLUSTER \
+            --services $FRONTEND_SERVICE
+
+      - name: Deployment complete
+        run: |
+          echo "Frontend: http://${{ steps.alb.outputs.dns }}"
+          echo "Backend:  http://${{ steps.alb.outputs.dns }}:8080"
