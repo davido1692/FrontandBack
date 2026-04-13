@@ -1,3 +1,7 @@
 node_modules/
 INTERVIEW_PREP.md
 POCKET_NOTES.md
+infra/.terraform/
+infra/.terraform.lock.hcl
+infra/terraform.tfstate
+infra/terraform.tfstate.backup
